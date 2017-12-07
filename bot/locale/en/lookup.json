@@ -1,0 +1,9 @@
+{
+    "default_user_name": "User",
+    "provide_delivery_address": "%s, please enter the delivery address for these flowers. Include apartment # if needed.",
+    "confirm_choice": "Great choice, %s Tickets for \"%s\"! on %s confirmed",
+    "confirm_price": "Price per ticket: $%s, Total Price: $%s",
+    "celebrity_1": "Celine Dion",
+    "celebrity_2": "Britney Spears",
+    "celebrity_3": "Jennifer Lopez"
+}

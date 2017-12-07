@@ -1,0 +1,23 @@
+{
+    "welcome_title": "Caesars Concert Reservation",
+    "welcome_subtitle": "Search for Live & Upcoming Concerts",
+    "concert_bot": "Caesars Concert Bot",
+    "main_options_lookup": "Lookup Upcoming Concerts",
+    "main_options_search": "Search for Event Celebrities",
+    "main_options_talk_to_support": "Talk to support",
+    "main_options_settings": "Settings",
+    "help": "Help",
+    "thank_you": "Support will contact you shortly. Have a nice day :)",
+    "choose_celebrity": "Choose Celebrity",
+    "enter_celebrity": "Enter Celebrity",
+    "event_date": "Choose Event Date",
+    "num_tickets": "How many tickets do you need?",
+    "celebrity_info": "Find Concert Information",
+    "concert_finder": "Welcome to the Caesars Concerts finder!",
+    "hello": "Hi, this is Caesars Concert Bot!",
+    "option": "Please choose an option from below",
+    "support": "Support will contact you shortly. Have a nice day :)",
+    "celebrity_1": "Celine Dion",
+    "celebrity_2": "Britney Spears",
+    "celebrity_3": "Jennifer Lopez"
+}

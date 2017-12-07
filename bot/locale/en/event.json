@@ -1,0 +1,11 @@
+{
+    "title_show_more": "Want more options?",
+    "show_more": "Yes, please!",
+    "select": "Select: ",
+    "unknown_option": "I couldn't understand your selection. Please try again.",
+    "choose_event_date": "Choose Event Date from below Available Dates",
+    "choose_bouquet_from_category": "Please select an event for \"%s\" category:",
+    "choose_num_tickets": "How many tickets do you need?",
+    "view_bouquets": "Choose Date",
+    "choose_this": "Select"
+}

@@ -1,0 +1,11 @@
+extends ../layout
+
+block content
+  p
+    strong
+        | Your order <em>#{order.id}</em> has been processed!
+  p
+    | <strong>#{order.selection.celebrity}</strong>
+    <strong>#{order.details.first_name} #{order.details.last_name}</strong>
+  p
+    | Thanks you for using Caesars Bot
