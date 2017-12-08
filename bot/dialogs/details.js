@@ -151,6 +151,7 @@ function processSubmitAction(session, value) {
         case 'continue':
             var returnValue = validateDetails(value);
             if (returnValue === 'true') {
+                session.userData.first_name = value.first_name;
                 session.endDialogWithResult({details: value});
             } else {
                 session.send(returnValue);

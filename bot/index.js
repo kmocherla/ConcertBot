@@ -1,6 +1,7 @@
 var builder = require('botbuilder');
 var siteUrl = require('./site-url');
 var cognitiveservices = require('botbuilder-cognitiveservices');
+var azure = require('botbuilder-azure');
 
 var connector = new builder.ChatConnector({
     appId: process.env.MICROSOFT_APP_ID,
@@ -16,37 +17,15 @@ var MainOptions = {
 
 var bot = new builder.UniversalBot(connector, function (session) {
 
-/*    if (localizedRegex(session, [MainOptions.Lookup]).test(session.message.text)) {
-        // Lookup Concerts
-        return session.beginDialog('lookup:/');
+    if(session.userData.first_name === undefined) {
+        session.userData.first_name = '';
     }
-
-    if (localizedRegex(session, [MainOptions.Search]).test(session.message.text)) {
-        // Search for Celebrity
-        return session.beginDialog('search:/');
-    }
-
-    var welcomeCard = new builder.HeroCard(session)
-        .title('welcome_title')
-        .subtitle('welcome_subtitle')
-        .images([
-            new builder.CardImage(session)
-                .url('https://placeholdit.imgix.net/~text?txtsize=56&txt=Caesars%20Concert%20Bot&w=640&h=330')
-                .alt('concert_bot')
-        ])
-        .buttons([
-            builder.CardAction.imBack(session, session.gettext(MainOptions.Lookup), MainOptions.Lookup),
-            builder.CardAction.imBack(session, session.gettext(MainOptions.Search), MainOptions.Search),
-            builder.CardAction.imBack(session, session.gettext(MainOptions.Support), MainOptions.Support)
-        ]);*/
 
     if (session.message && session.message.value) {
-        // A Card's Submit Action obj was received
         processSubmitAction(session, session.message.value);
         return;
     }
 
-    // Display Welcome card with Concerts and Flights search options
     var welcomeCard = {
         'contentType': 'application/vnd.microsoft.card.adaptive',
         'content': {
@@ -96,7 +75,6 @@ var bot = new builder.UniversalBot(connector, function (session) {
                 }
             ],
             'actions': [
-                // Concerts Search form
                 {
                     'type': 'Action.ShowCard',
                     'title': session.gettext(MainOptions.Lookup),
@@ -283,6 +261,9 @@ function validateSearch(celebritySearch) {
     return true;
 }
 
+// Enable User Data persistence
+bot.set('persistUserData', true);
+
 // Enable Conversation Data persistence
 bot.set('persistConversationData', true);
 
@@ -292,6 +273,7 @@ bot.set('localizerSettings', {
     defaultLocale: 'en'
 });
 
+/* ******************************************* QnA Module Begin ******************************************* */
 var recognizer = new cognitiveservices.QnAMakerRecognizer({
     knowledgeBaseId: process.env.QnAKnowledgebaseId, 
     subscriptionKey: process.env.QnASubscriptionKey,
@@ -330,14 +312,28 @@ basicQnAMakerDialog.defaultWaitNextMessage = function(session, qnaMakerResult){
 bot.dialog('qna', basicQnAMakerDialog)
 .triggerAction({
     matches: [/^(?!.*(help|menu|settings|support|restart|start over|Changed my mind))/i],
-//    matches: /^qna/i,
     onSelectAction: (session, args, next) => {
-        // Add the help dialog to the top of the dialog stack 
-        // (override the default behavior of replacing the stack)
         session.beginDialog(args.action, args);
-        //session.message.text = null;
     }
 });
+/* ******************************************* QnA Module End ******************************************* */
+
+
+/* ******************************************* DocDB Module Begin ******************************************* */
+
+// Azure DocumentDb State Store
+var docDbClient = new azure.DocumentDbClient({
+   host: process.env.DOCUMENT_DB_HOST,
+   masterKey: process.env.DOCUMENT_DB_MASTER_KEY,
+   database: process.env.DOCUMENT_DB_DATABASE,
+   collection: process.env.DOCUMENT_DB_COLLECTION
+});
+var botStorage = new azure.AzureBotStorage({ gzipData: false }, docDbClient);
+
+// Set Custom Store
+bot.set('storage', botStorage);
+
+/* ******************************************* DocDB Module End ******************************************* */
 
 
 // Sub-Dialogs
@@ -362,6 +358,7 @@ bot.use({
 
         var settingsRegex = localizedRegex(session, ['main_options_settings']);
         var supportRegex = localizedRegex(session, ['main_options_talk_to_support', 'help']);
+        var restartRegex = localizedRegex(session, ['restart', 'start_over', 'change_my_mind', 'menu']);
 
         if (settingsRegex.test(text)) {
             // interrupt and trigger 'settings' dialog 
@@ -369,6 +366,12 @@ bot.use({
         } else if (supportRegex.test(text)) {
             // interrupt and trigger 'help' dialog
             return session.beginDialog('help:/');
+        } else if (restartRegex.test(text)) {
+            session.send(
+                session.gettext('restart_message'),
+                session.userData.first_name
+            );
+            return bot.beginDialog(session.message.address, '/');
         } else {
             // continue normal flow
             next();

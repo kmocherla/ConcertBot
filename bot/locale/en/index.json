@@ -19,5 +19,10 @@
     "support": "Support will contact you shortly. Have a nice day :)",
     "celebrity_1": "Celine Dion",
     "celebrity_2": "Britney Spears",
-    "celebrity_3": "Jennifer Lopez"
+    "celebrity_3": "Jennifer Lopez",
+    "restart": "restart",
+    "start_over": "start over",
+    "changed_my_mind": "Changed my mind",
+    "menu": "menu",
+    "restart_message": "Restarting session. What would you like to do %s?"
 }

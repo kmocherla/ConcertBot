@@ -39,7 +39,7 @@ lib.dialog('/', [
                 .text(messageText)
                 .buttons([
                     builder.CardAction.openUrl(session, checkoutUrl, 'add_credit_card'),
-                    builder.CardAction.imBack(session, session.gettext(RestartMessage), RestartMessage)
+                    //builder.CardAction.imBack(session, session.gettext(RestartMessage), RestartMessage)
                 ]);
 
             session.send(new builder.Message(session)
