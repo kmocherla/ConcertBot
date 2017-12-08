@@ -1,3 +1,4 @@
+var util = require('util');
 var builder = require('botbuilder');
 var siteUrl = require('./site-url');
 var cognitiveservices = require('botbuilder-cognitiveservices');
@@ -185,6 +186,94 @@ var bot = new builder.UniversalBot(connector, function (session) {
                         ]
                     }
                 },
+                // Hotels Search form
+                {
+                    'type': 'Action.ShowCard',
+                    'title': 'Hotels',
+                    'speak': '<s>Hotels</s>',
+                    'card': {
+                        'type': 'AdaptiveCard',
+                        'body': [
+                            {
+                                'type': 'TextBlock',
+                                'text': 'Welcome to the Caesars Hotels Reservation !',
+                                'speak': '<s>Welcome to the Caesars Hotels Reservation !</s>',
+                                'weight': 'bolder',
+                                'size': 'medium'
+                            },
+                            {
+                                'type': 'TextBlock',
+                                'text': 'Please choose your Location:'
+                            },
+                            {
+                                  "type": "Input.ChoiceSet",
+                                  "id": "destination",
+                                  "style": "compact",
+                                  "placeholder": 'Select from below choices',
+                                  //"value": "0",
+                                  "choices": [
+                                    {
+                                      "title": "Las Vegas",
+                                      "value": "Las Vegas"
+                                    },
+                                    {
+                                      "title": "Atlantic City",
+                                      "value": "Atlantic City"
+                                    },
+                                    {
+                                      "title": "Baltimore",
+                                      "value": "Baltimore"
+                                    },
+                                    {
+                                      "title": "Gulf Coast",
+                                      "value": "Gulf Coast"
+                                    },                                    
+                                    {
+                                      "title": "Lake Tahoe",
+                                      "value": "Lake Tahoe"
+                                    }
+                                  ]
+                                },
+                            // {
+                            //     'type': 'Input.Text',
+                            //     'id': 'destination',
+                            //     'speak': '<s>Please choose your destination</s>',
+                            //     'placeholder': 'Miami, Florida',
+                            //     'style': 'text'
+                            // },
+                            {
+                                'type': 'TextBlock',
+                                'text': 'When do you want to check in?'
+                            },
+                            {
+                                'type': 'Input.Date',
+                                'id': 'checkin',
+                                'speak': '<s>When do you want to check in?</s>'
+                            },
+                            {
+                                'type': 'TextBlock',
+                                'text': 'How many nights do you want to stay?'
+                            },
+                            {
+                                'type': 'Input.Number',
+                                'id': 'nights',
+                                'min': 1,
+                                'max': 60,
+                                'speak': '<s>How many nights do you want to stay?</s>'
+                            }
+                        ],
+                        'actions': [
+                            {
+                                'type': 'Action.Submit',
+                                'title': 'Search',
+                                'speak': '<s>Search</s>',
+                                'data': {
+                                    'type': 'hotelSearch'
+                                }
+                            }
+                        ]
+                    }
+                },
                 {
                     'type': 'Action.ShowCard',
                     'title': session.gettext(MainOptions.Support),
@@ -227,6 +316,27 @@ function processSubmitAction(session, value) {
                 session.send(defaultErrorMessage);
             }
             break;
+
+        case 'hotelSearch':
+            // Search, validate parameters
+            if (validateHotelSearch(value)) {
+                // proceed to search
+                session.beginDialog('hotel-search:/', value);
+            } else {
+                session.send(defaultErrorMessage);
+            }
+            break;
+
+        case 'hotelSelection':
+            // Hotel selection
+            sendHotelSelection(session, value);
+            break;
+
+        case 'showSummary':
+            // Hotel selection
+            showSummaryCard(session, value);
+            break;
+
 
         default:
             session.send(defaultErrorMessage);
@@ -337,6 +447,7 @@ bot.set('storage', botStorage);
 
 
 // Sub-Dialogs
+bot.library(require('./dialogs/hotel-search').createLibrary());
 bot.library(require('./dialogs/lookup').createLibrary());
 bot.library(require('./dialogs/search').createLibrary());
 bot.library(require('./dialogs/celebrity').createLibrary());
@@ -431,3 +542,513 @@ module.exports = {
     beginDialog: beginDialog,
     sendMessage: sendMessage
 };
+
+
+function validateHotelSearch(hotelSearch) {
+    if (!hotelSearch) {
+        return false;
+    }
+
+    // Destination
+    var hasDestination = typeof hotelSearch.destination === 'string' && hotelSearch.destination.length > 3;
+
+    // Checkin
+    var checkin = Date.parse(hotelSearch.checkin);
+    var hasCheckin = !isNaN(checkin);
+    if (hasCheckin) {
+        hotelSearch.checkin = new Date(checkin);
+    }
+
+    // Nights
+    var nights = parseInt(hotelSearch.nights, 10);
+    var hasNights = !isNaN(nights);
+    if (hasNights) {
+        hotelSearch.nights = nights;
+    }
+
+    return hasDestination && hasCheckin && hasNights;
+}
+var hotelObj;
+function sendHotelSelection(session, hotel) {
+    hotelObj=hotel;
+    var description = util.format('%d stars with %d reviews. From $%d per night.', hotel.rating, hotel.numberOfReviews, hotel.priceStarting);
+    var card = {
+        'contentType': 'application/vnd.microsoft.card.adaptive',
+        'content': {
+            '$schema': 'http://adaptivecards.io/schemas/adaptive-card.json',
+            'type': 'AdaptiveCard',
+            'version': '1.0',
+            'body': [
+                {
+                    'type': 'Container',
+                    'items': [
+                        {
+                            'type': 'TextBlock',
+                            'text': hotel.name + ' in ' + hotel.location,
+                            'weight': 'bolder',
+                            'speak': '<s>' + hotel.name + '</s>'
+                        },
+                        {
+                            'type': 'TextBlock',
+                            'text': description,
+                            'speak': '<s>' + description + '</s>'
+                        },
+                        {
+                            'type': 'Image',
+                            'size': 'auto',
+                            'url': hotel.image
+                        },
+                        {
+                          "type": "TextBlock",
+                          "text": "Your registration completition is few steps away",
+                          "size": "medium",
+                          "weight": "bolder"
+                        },
+                        {
+                          "type": "TextBlock",
+                          "text": "What type of room do you prefer?",
+                          "wrap": true
+                        },
+                        {
+                          "type": "ImageSet",
+                          "imageSize": "medium",
+                          "images": [
+
+                            {
+                              "type": "Image",
+                              "text": "1 King Bed",
+                              "url": "/Users/hgamineni/Projects/BotBuilder-Samples/Node/cards-AdaptiveCards/images/cp_1kingbed.jpg"
+                            },
+                            {
+                              "type": "Image",
+                              "url": "/Users/hgamineni/Projects/BotBuilder-Samples/Node/cards-AdaptiveCards/images/cp_2queenbed.jpg"
+                            },
+                            {
+                              "type": "Image",
+                              "url": "/Users/hgamineni/Projects/BotBuilder-Samples/Node/cards-AdaptiveCards/images/cp_classic_suite.jpg"
+                            },
+                            {
+                              "type": "Image",
+                              "url": "/Users/hgamineni/Projects/BotBuilder-Samples/Node/cards-AdaptiveCards/images/cp_exec_suite.jpg"
+                            },
+                            {
+                              "type": "Image",
+                              "url": "/Users/hgamineni/Projects/BotBuilder-Samples/Node/cards-AdaptiveCards/images/cp_duplex_suite.jpg"
+                            }
+
+                          ]
+                        },
+                        {
+                              "type": "Input.ChoiceSet",
+                              "id": "roomType",
+                              "style": "compact",
+                              "placeholder": 'Choose room type',
+                              //"value": "0",
+                              "choices": [
+                                {
+                                  "title": "1 King Bed",
+                                  "value": "1 King Bed"
+                                },
+                                {
+                                  "title": "2 Queen Bed",
+                                  "value": "2 Queen Bed"
+                                },
+                                {
+                                  "title": "Classic Suite",
+                                  "value": "Classic Suite"
+                                },
+                                {
+                                  "title": "Executie Suite",
+                                  "value": "Executive Suite"
+                                },                                    
+                                {
+                                  "title": "Duplex Suite",
+                                  "value": "Duplex Suite"
+                                }
+                              ]
+                          },
+                          { // form for registration
+                              "type": "ColumnSet",
+                              "columns": [
+                                {
+                                  "type": "Column",
+                                  "width": 2,
+                                  "items": [
+                                    {
+                                      "type": "TextBlock",
+                                      "text": "Tell us about yourself",
+                                      "weight": "bolder",
+                                      "size": "medium"
+                                    },
+                                    {
+                                      "type": "TextBlock",
+                                      "text": "We just need a few more details to get you booked for the trip of a lifetime!",
+                                      "isSubtle": true,
+                                      "wrap": true
+                                    },
+                                    {
+                                      "type": "TextBlock",
+                                      "text": "Don't worry, we'll never share or sell your information.",
+                                      "isSubtle": true,
+                                      "wrap": true,
+                                      "size": "small"
+                                    },
+                                    {
+                                      "type": "TextBlock",
+                                      "text": "Your name",
+                                      "wrap": true
+                                    },
+                                    {
+                                      "type": "Input.Text",
+                                      "id": "myName",
+                                      "placeholder": "Last, First"
+                                    },
+                                    {
+                                      "type": "TextBlock",
+                                      "text": "Your Address",
+                                      "wrap": true
+                                    },
+                                    {
+                                      "type": "Input.Text",
+                                      "id": "myAddr",
+                                      "placeholder": "Apartment#, City, State, Zip"
+                                    },                                        
+                                    {
+                                      "type": "TextBlock",
+                                      "text": "Your email",
+                                      "wrap": true
+                                    },
+                                    {
+                                      "type": "Input.Text",
+                                      "id": "myEmail",
+                                      "placeholder": "youremail@example.com",
+                                      "style": "email"
+                                    },
+                                    {
+                                      "type": "TextBlock",
+                                      "text": "Phone Number"
+                                    },
+                                    {
+                                      "type": "Input.Text",
+                                      "id": "myTel",
+                                      "placeholder": "xxx.xxx.xxxx",
+                                      "style": "tel"
+                                    }                                        
+                                 ]
+
+                                }
+
+                                ],
+                              "actions": [
+                                {
+                                  "type": "Action.Submit",
+                                  "title": "Submit"
+                                }
+                               ]                    
+                            }
+                        ]
+                        }
+                    ],
+                        "actions": [
+                            {
+                              "type": "Action.ShowCard",
+                              "title": "Preferences",
+                              "card": {
+                                "type": "AdaptiveCard",
+                                "body": [
+                                  {
+                                    "type": "TextBlock",
+                                    "text": "Choose which meal to be served to room ?",
+                                    "size": "medium",
+                                    "wrap": true
+                                  },
+                                  {
+                                    "type": "Input.ChoiceSet",
+                                    "id": "preferences",
+                                    "isMultiSelect": true,
+                                    //"style": "expanded",
+                                    "choices": [
+                                      {
+                                        "title": "Breakfast",
+                                        "value": "breakfast"
+                                      },
+                                      {
+                                        "title": "Lunch",
+                                        "value": "lunch"
+                                      },
+                                      {
+                                        "title": "Dinner",
+                                        "value": "dinner"
+                                      }
+                                    ]
+                                  },
+                                  {
+                                    "type": "Input.Text",
+                                    "id": "otherPref",
+                                    "isMultiline": true,
+                                    "placeholder": "Any other preferences ?"
+                                  }
+                                ],
+                                "actions": [
+                                  {
+                                    "type": "Action.Submit",
+                                    "title": "OK",
+                                    'speak': '<s>OK/s>',
+                                    'data': {
+                                        'type': 'showSummary'
+                                    }
+                                  }
+                                ]
+                              }
+                            }
+            ]
+        }
+    };
+
+    var msg = new builder.Message(session)
+        .addAttachment(card);
+
+    session.send(msg);
+}
+
+function showSummaryCard(session, regForm){
+
+   var days = parseInt(hotelObj.checkout.substring(8,10)) - parseInt(hotelObj.checkin.substring(8,10));
+ 
+    var card= 
+            {
+        'contentType': 'application/vnd.microsoft.card.adaptive',
+        'content': {
+                "$schema": "http://adaptivecards.io/schemas/adaptive-card.json",
+                "version": "1.0",
+                "type": "AdaptiveCard",
+                "speak": "Your Hotel is confirmed for you and 4 others",
+                "body": [
+                    {
+                        "type": "TextBlock",
+                        "text": "Your Hotel stay info",
+                        "weight": "bolder",
+                        "isSubtle": false
+                    },
+                    {
+                        "type": "TextBlock",
+                        "text": "Hotel: "+hotelObj.name,
+                        "separator": true
+                    },
+                    {
+                        "type": "TextBlock",
+                        "text": "Location: "+hotelObj.location,
+                        "spacing": "none"
+                    },
+                    {
+                        'type': 'Image',
+                        'size': 'auto',
+                        'url': hotelObj.image
+                    },
+                    {
+                        "type": "TextBlock",
+                        "text": "Room type choosen: "+regForm.roomType,
+                        "spacing": "none"
+                    },
+                    {
+                        "type": "TextBlock",
+                        "text": "Booked on Name: "+regForm.myName,
+                        "weight": "bolder",
+                        "spacing": "medium"
+                    },
+                    {
+                        "type": "TextBlock",
+                        "text": "Address: "+regForm.myAddr,
+                        //"weight": "bolder",
+                        "spacing": "medium"
+                    },
+                   {
+                        "type": "TextBlock",
+                        "text": "Contact: "+regForm.myEmail+" "+regForm.myTel,
+                        //"weight": "bolder",
+                        "spacing": "medium"
+                    },                    
+                    {
+                        "type": "TextBlock",
+                        "text": "Date Booked on: "+hotelObj.checkin.substring(0,4)+'-'+hotelObj.checkin.substring(5,7)+'-'+hotelObj.checkin.substring(8,10)+" through Caesars Bot",
+                        //"weight": "bolder",
+                        "spacing": "none"
+                    },
+                    {
+                        "type": "ColumnSet",
+                        "separator": true,
+                        "columns": [
+                            {
+                                "type": "Column",
+                                "width": 1,
+                                "items": [
+                                    {
+                                        "type": "TextBlock",
+                                        "text": "Check - in",
+                                        "isSubtle": true
+                                    },
+                                    {
+                                        "type": "TextBlock",
+                                        "size": "extraLarge",
+                                        "color": "accent",
+                                        "text": hotelObj.checkin.substring(0,4)+'-'+hotelObj.checkin.substring(5,7)+'-'+hotelObj.checkin.substring(8,10),
+                                        "spacing": "none"
+                                    }
+                                ]
+                            },
+                            {
+                                "type": "Column",
+                                "width": "auto",
+                                "items": [
+                                    {
+                                        "type": "TextBlock",
+                                        "text": " "
+                                    },
+                                    {
+                                        "type": "Image",
+                                        "url": "/Users/hgamineni/Projects/BotBuilder-Samples/Node/cards-AdaptiveCards/images/cp_duplex_suite.jpg", 
+                                        //"http://messagecardplayground.azurewebsites.net/assets/airplane.png",
+                                        "size": "small",
+                                        "spacing": "none"
+                                    }
+                                ]
+                            },
+                            {
+                                "type": "Column",
+                                "width": 1,
+                                "items": [
+                                    {
+                                        "type": "TextBlock",
+                                        "horizontalAlignment": "right",
+                                        "text": "Check - out",
+                                        "isSubtle": true
+                                    },
+                                    {
+                                        "type": "TextBlock",
+                                        "horizontalAlignment": "right",
+                                        "size": "extraLarge",
+                                        "color": "accent",
+                                        "text": hotelObj.checkout.substring(0,4)+'-'+hotelObj.checkout.substring(5,7)+'-'+hotelObj.checkout.substring(8,10),
+                                        "spacing": "none"
+                                    }
+                                ]
+                            }
+                        ]
+                    },
+                    {
+                        "type": "TextBlock",
+                        "text": "Preferences: Serve "+regForm.preferences+" to room",
+                        //"weight": "bolder",
+                        "spacing": "medium"
+                    },
+                    {
+                        "type": "TextBlock",
+                        "text": "Other preferences: "+regForm.otherPref,
+                        //"weight": "bolder",
+                        "spacing": "none"
+                    },
+                    // {
+                    //     "type": "ColumnSet",
+                    //     "separator": true,
+                    //     "columns": [
+                    //         {
+                    //             "type": "Column",
+                    //             "width": 1,
+                    //             "items": [
+                    //                 {
+                    //                     "type": "TextBlock",
+                    //                     "text": "Amsterdam",
+                    //                     "isSubtle": true
+                    //                 },
+                    //                 {
+                    //                     "type": "TextBlock",
+                    //                     "size": "extraLarge",
+                    //                     "color": "accent",
+                    //                     "text": "AMS",
+                    //                     "spacing": "none"
+                    //                 }
+                    //             ]
+                    //         },
+                    //         {
+                    //             "type": "Column",
+                    //             "width": "auto",
+                    //             "items": [
+                    //                 {
+                    //                     "type": "TextBlock",
+                    //                     "text": " "
+                    //                 },
+                    //                 {
+                    //                     "type": "Image",
+                    //                     "url": "http://messagecardplayground.azurewebsites.net/assets/airplane.png",
+                    //                     "size": "small",
+                    //                     "spacing": "none"
+                    //                 }
+                    //             ]
+                    //         },
+                    //         {
+                    //             "type": "Column",
+                    //             "width": 1,
+                    //             "items": [
+                    //                 {
+                    //                     "type": "TextBlock",
+                    //                     "horizontalAlignment": "right",
+                    //                     "text": "San Francisco",
+                    //                     "isSubtle": true
+                    //                 },
+                    //                 {
+                    //                     "type": "TextBlock",
+                    //                     "horizontalAlignment": "right",
+                    //                     "size": "extraLarge",
+                    //                     "color": "accent",
+                    //                     "text": "SFO",
+                    //                     "spacing": "none"
+                    //                 }
+                    //             ]
+                    //         }
+                    //     ]
+                    // },
+                    {
+                        "type": "ColumnSet",
+                        "spacing": "medium",
+                        "columns": [
+                            {
+                                "type": "Column",
+                                "width": "1",
+                                "items": [
+                                    {
+                                        "type": "TextBlock",
+                                        "text": "Total",
+                                        "size": "medium",
+                                        "isSubtle": true
+                                    }
+                                ]
+                            },
+                            {
+                                "type": "Column",
+                                "width": 1,
+                                "items": [
+                                    {
+                                        "type": "TextBlock",
+                                        "horizontalAlignment": "right",
+                                        "text": "$"+(days*hotelObj.priceStarting),
+                                        "size": "medium",
+                                        "weight": "bolder"
+                                    }
+                                ]
+                            }
+                        ]
+                    }
+                ],
+                  "actions": [
+                    {
+                      "type": "Action.Submit",
+                      "title": "Confirm & Proceed"
+                    }
+                  ]
+            }
+        };
+    var msg = new builder.Message(session)
+        .addAttachment(card);
+    session.send(msg);
+
+}
