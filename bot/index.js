@@ -3,6 +3,7 @@ var builder = require('botbuilder');
 var siteUrl = require('./site-url');
 var cognitiveservices = require('botbuilder-cognitiveservices');
 var azure = require('botbuilder-azure');
+var opnUrl = require('opn');
 
 var needle = require('needle'),
     url = require('url'),
@@ -463,6 +464,7 @@ function parseAnchorTag(input) {
 function handleSuccessResponse(session, caption) {
     if (caption) {
         session.send('I think it\'s ' + caption);
+        redirectUrl(caption);
     }
     else {
         session.send('Couldn\'t find a caption for this one');
@@ -479,6 +481,22 @@ function handleErrorResponse(session, error) {
     console.error(error);
     session.send(clientErrorMessage);
 }
+
+function redirectUrl(caption) {
+
+    if(caption.toLowerCase().indexOf('caesars') > -1) {
+        opnUrl('https://www.caesars.com/caesars-palace');
+    } else if(caption.toLowerCase().indexOf('paris') > -1) {
+        opnUrl('https://www.caesars.com/paris-las-vegas');
+    } else if(caption.toLowerCase().indexOf('celine') > -1) {
+        opnUrl('http://www.celineinvegas.com/tickets.php');
+    } else if(caption.toLowerCase().indexOf('britney') > -1) {
+        opnUrl('https://www.caesars.com/planet-hollywood/shows/britney-spears-las-vegas');
+    } else if(caption.toLowerCase().indexOf('j-lo') > -1) {
+        opnUrl('https://www.caesars.com/planet-hollywood/shows/jennifer-lopez');
+    }
+}
+
 /* ******************************************* Image Module End ******************************************* */
 
 
