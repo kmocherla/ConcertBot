@@ -7,6 +7,7 @@
   },
   "dependencies": {
     "@google/maps": "^0.4.5",
+    "@rgrove/parse-xml": "^1.1.1",
     "applicationinsights": "^1.0.1",
     "bluebird": "^3.5.1",
     "body-parser": "^1.15.2",
@@ -29,6 +30,7 @@
     "serve-favicon": "^2.3.2",
     "underscore": "^1.8.3",
     "url": "^0.11.0",
+    "urlencode": "^1.1.0",
     "uuid": "^3.0.1",
     "valid-url": "^1.0.9"
   }

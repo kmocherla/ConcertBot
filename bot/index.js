@@ -4,6 +4,9 @@ var siteUrl = require('./site-url');
 var cognitiveservices = require('botbuilder-cognitiveservices');
 var azure = require('botbuilder-azure');
 var opnUrl = require('opn');
+const parseXml = require('@rgrove/parse-xml');
+var urlencode = require('urlencode');
+var request = require('request');
 
 var needle = require('needle'),
     url = require('url'),
@@ -400,6 +403,42 @@ bot.set('localizerSettings', {
 });
 
 
+/* ******************************************* Multi-Lingual Module Begin ******************************************* */
+
+var TOLOCALE = 'en';
+var FROMLOCALE = 'zh-CHS';
+var translator = function (session, callback) {
+
+    if (session.message && session.message.text) {
+        var urlencodedtext = urlencode(session.message.text);
+        var options = {
+            method: 'GET',
+            url: 'http://api.microsofttranslator.com/v2/Http.svc/Translate'
+                +'?text=' + urlencodedtext
+                +'&from=' + FROMLOCALE +'&to=' + TOLOCALE,
+            headers: {
+                'Ocp-Apim-Subscription-Key': process.env.LANG_TRANSLATION_KEY
+            }
+        };
+        console.log("The request url is " + options.url);
+        request(options, function (error, response, body){
+            if(error){
+                console.log('Error:', error);
+                return 'error';
+            } else if(response.statusCode !== 200){
+                console.log('Invalid Status Code Returned:', response.statusCode);
+                return 'error';
+            } else {
+                var stringResponse = JSON.stringify(response.body);
+                var translatedText = JSON.parse(JSON.stringify(parseXml(response.body)));
+                session.message.text = translatedText.children[0].children[0].text.toLowerCase();
+                return callback(translatedText.children[0].children[0].text);
+            }
+        });
+    }
+ }
+/* ******************************************* Multi-Lingual Module End ******************************************* */
+
 
 /* ******************************************* Image Module Begin ******************************************* */
 
@@ -587,6 +626,9 @@ bot.use({
         var settingsRegex = localizedRegex(session, ['main_options_settings']);
         var supportRegex = localizedRegex(session, ['main_options_talk_to_support', 'help']);
         var restartRegex = localizedRegex(session, ['restart', 'start_over', 'change_my_mind', 'menu']);
+        var translatedText = translator(session, function(response) {
+            console.log(response);
+        });
 
         if (settingsRegex.test(text)) {
             // interrupt and trigger 'settings' dialog 
