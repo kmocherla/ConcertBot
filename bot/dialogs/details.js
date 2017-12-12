@@ -145,6 +145,52 @@ lib.dialog('address', [
     }
 ]);
 
+lib.dialog('username', [
+    function (session) {
+
+    if (session.message && session.message.value && session.message.value.type === 'username') {
+        processSubmitAction(session, session.message.value);
+        return;
+    }
+
+    var usernameCard = {
+        'contentType': 'application/vnd.microsoft.card.adaptive',
+        'content': {
+            '$schema': 'http://adaptivecards.io/schemas/adaptive-card.json',
+            'type': 'AdaptiveCard',
+            'version': '1.0',
+            'body': [
+                {
+                    'type': 'TextBlock',
+                    'text': session.gettext('ask_username'),
+                    'weight': 'bolder',
+                    'size': 'medium'
+                },
+                {
+                    "type": "Input.Text",
+                    "id": "username",
+                    'speak': '<s>' + session.gettext('ask_username') + '</s>',
+                    "placeholder": "Username"
+                }
+            ],
+            'actions': [
+                {
+                    'type': 'Action.Submit',
+                    'title': 'Submit',
+                    'speak': '<s>Submit</s>',
+                    'data': {
+                        'type': 'username'
+                    }
+                }
+            ]
+        }
+    };
+
+    session.send(new builder.Message(session)
+        .addAttachment(usernameCard));
+    }
+]);
+
 function processSubmitAction(session, value) {
     var defaultErrorMessage = 'Please complete all the details';
     switch (value.type) {
@@ -167,6 +213,12 @@ function processSubmitAction(session, value) {
                     session.send(err);
                 }
             });
+            break;
+
+        case 'username':
+            console.log(value);
+            session.userData.username = value.username;
+            session.endDialog();
             break;
 
         default:

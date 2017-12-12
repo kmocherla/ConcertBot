@@ -4,6 +4,7 @@ require('dotenv-extended').load();
 var express = require('express');
 var path = require('path');
 var favicon = require('serve-favicon');
+var opnUrl = require('opn');
 
 // Web app
 var app = express();
@@ -30,7 +31,7 @@ app.post('/api/messages', bot.listen());
 
 // Catch 404 and forward to error handler
 app.use(function (req, res, next) {
-  console.log(res);
+//  console.log(res);
   var err = new Error('Not Found');
   err.status = 404;
   next(err);
@@ -63,3 +64,38 @@ var port = process.env.port || process.env.PORT || 3978;
 app.listen(port, function () {
   console.log('Web Server listening on port %s', port);
 });
+
+
+/* ******************************************* Handoff Module Being ******************************************* */
+
+var handoff_0 = require("botbuilder-handoff");
+var bot = require("./bot");
+
+const isAgent = (session) => session.message.user.name.startsWith("Agent");
+
+handoff_0.setup(bot.bot, app, isAgent, {
+    retainData: process.env.RETAIN_DATA,
+    textAnalyticsKey: process.env.CG_SENTIMENT_KEY,
+    mongodbProvider: process.env.MONGODB_PROVIDER,
+    directlineSecret: process.env.MICROSOFT_DIRECTLINE_SECRET
+//    appInsightsInstrumentationKey: process.env.APPINSIGHTS_INSTRUMENTATIONKEY,
+//    customerStartHandoffCommand: process.env.CUSTOMER_START_HANDOFF_COMMAND
+});
+
+//triggerHandoff manually
+bot.bot.dialog('/connectToHuman', (session) => {
+    session.send("Hold on, buddy! Connecting you to the next available agent!");
+    handoff_0.triggerHandoff(session);
+    // Open URL
+    opnUrl('http://'
+      + 'localhost:'
+      + port
+      + '/index.html?s='
+      + process.env.MICROSOFT_DIRECTLINE_SECRET);
+
+}).triggerAction({
+    matches: /^agent/i,
+});
+
+/* ******************************************* Handoff Module End ******************************************* */
+

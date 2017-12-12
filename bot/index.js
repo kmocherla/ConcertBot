@@ -4,6 +4,11 @@ var siteUrl = require('./site-url');
 var cognitiveservices = require('botbuilder-cognitiveservices');
 var azure = require('botbuilder-azure');
 
+var needle = require('needle'),
+    url = require('url'),
+    validUrl = require('valid-url'),
+    captionService = require('./caption-service');
+
 var connector = new builder.ChatConnector({
     appId: process.env.MICROSOFT_APP_ID,
     appPassword: process.env.MICROSOFT_APP_PASSWORD
@@ -18,194 +23,214 @@ var MainOptions = {
 
 var bot = new builder.UniversalBot(connector, function (session) {
 
-    if(session.userData.first_name === undefined) {
-        session.userData.first_name = '';
-    }
+        if(session.userData.first_name === undefined) {
+            session.userData.first_name = '';
+        }
 
-    if (session.message && session.message.value) {
-        processSubmitAction(session, session.message.value);
-        return;
-    }
+        if (session.message && session.message.value) {
+            processSubmitAction(session, session.message.value);
+            return;
+        }
 
-    var welcomeCard = {
-        'contentType': 'application/vnd.microsoft.card.adaptive',
-        'content': {
-            '$schema': 'http://adaptivecards.io/schemas/adaptive-card.json',
-            'type': 'AdaptiveCard',
-            'version': '1.0',
-            'body': [
-                {
-                    'type': 'Container',
-                    'speak': '<s>' + session.gettext('hello') + '</s><s>' + session.gettext('option') + '</s>',
-                    'items': [
-                        {
-                            'type': 'ColumnSet',
-                            'columns': [
+        if (hasImageAttachment(session)) {
+            var stream = getImageStreamFromMessage(session.message);
+            captionService
+                .getCaptionFromStream(stream)
+                .then(function (caption) { handleSuccessResponse(session, caption); })
+                .catch(function (error) { handleErrorResponse(session, error); });
+                return;
+        } else if(session.message.text) {
+            var imageUrl = parseAnchorTag(session.message.text)
+                || (validUrl.isUri(session.message.text) ? session.message.text : null);
+            if (imageUrl) {
+                captionService
+                    .getCaptionFromUrl(imageUrl)
+                    .then(function (caption) { handleSuccessResponse(session, caption); })
+                    .catch(function (error) { handleErrorResponse(session, error); });
+            } else {
+                //session.send('Did you upload an image? I\'m more of a visual person. Try sending me an image or an image URL');
+            }
+            return;
+        }
+
+        var welcomeCard = {
+            'contentType': 'application/vnd.microsoft.card.adaptive',
+            'content': {
+                '$schema': 'http://adaptivecards.io/schemas/adaptive-card.json',
+                'type': 'AdaptiveCard',
+                'version': '1.0',
+                'body': [
+                    {
+                        'type': 'Container',
+                        'speak': '<s>' + session.gettext('hello') + '</s><s>' + session.gettext('option') + '</s>',
+                        'items': [
+                            {
+                                'type': 'ColumnSet',
+                                'columns': [
+                                    {
+                                        'type': 'Column',
+                                        'size': 'auto',
+                                        'items': [
+                                            {
+                                                'type': 'Image',
+                                                'url': 'https://placeholdit.imgix.net/~text?txtsize=65&txt=Caesars+Concert+Bot&w=300&h=300',
+                                                'size': 'medium',
+                                                'style': 'person'
+                                            }
+                                        ]
+                                    },
+                                    {
+                                        'type': 'Column',
+                                        'size': 'stretch',
+                                        'items': [
+                                            {
+                                                'type': 'TextBlock',
+                                                'text': session.gettext('hello'),
+                                                'weight': 'bolder',
+                                                'isSubtle': true
+                                            },
+                                            {
+                                                'type': 'TextBlock',
+                                                'text': session.gettext('option'),
+                                                'wrap': true
+                                            }
+                                        ]
+                                    }
+                                ]
+                            }
+                        ]
+                    }
+                ],
+                'actions': [
+                    {
+                        'type': 'Action.ShowCard',
+                        'title': session.gettext(MainOptions.Lookup),
+                        'speak': '<s>' + session.gettext(MainOptions.Lookup) + '</s>',
+                        'card': {
+                            'type': 'AdaptiveCard',
+                            'body': [
                                 {
-                                    'type': 'Column',
-                                    'size': 'auto',
-                                    'items': [
+                                    'type': 'TextBlock',
+                                    'text': session.gettext('concert_finder'),
+                                    'speak': '<s>' + session.gettext('concert_finder') + '</s>',
+                                    'weight': 'bolder',
+                                    'size': 'medium'
+                                },
+                                {
+                                    'type': 'TextBlock',
+                                    'text': session.gettext('choose_celebrity')
+                                },
+                                {
+                                    "type": "Input.ChoiceSet",
+                                    "id": "celebrity",
+                                    "style": "compact",
+                                    "isMultiSelect": false,
+                                    "value": "1",
+                                    "choices": [
                                         {
-                                            'type': 'Image',
-                                            'url': 'https://placeholdit.imgix.net/~text?txtsize=65&txt=Caesars+Concert+Bot&w=300&h=300',
-                                            'size': 'medium',
-                                            'style': 'person'
+                                            "title": session.gettext('celebrity_1'),
+                                            "value": "1"
+                                        },
+                                        {
+                                            "title": session.gettext('celebrity_2'),
+                                            "value": "2"
+                                        },
+                                        {
+                                            "title": session.gettext('celebrity_3'),
+                                            "value": "3"
                                         }
                                     ]
                                 },
                                 {
-                                    'type': 'Column',
-                                    'size': 'stretch',
-                                    'items': [
-                                        {
-                                            'type': 'TextBlock',
-                                            'text': session.gettext('hello'),
-                                            'weight': 'bolder',
-                                            'isSubtle': true
-                                        },
-                                        {
-                                            'type': 'TextBlock',
-                                            'text': session.gettext('option'),
-                                            'wrap': true
-                                        }
-                                    ]
+                                    'type': 'TextBlock',
+                                    'text': session.gettext('event_date')
+                                },
+                                {
+                                    'type': 'Input.Date',
+                                    'id': 'event_date',
+                                    'speak': '<s>' + session.gettext('event_date') + '</s>'
+                                },
+                                {
+                                    'type': 'TextBlock',
+                                    'text': session.gettext('num_tickets')
+                                },
+                                {
+                                    'type': 'Input.Number',
+                                    'id': 'num_tickets',
+                                    'min': 1,
+                                    'max': 60,
+                                    'speak': '<s>' + session.gettext('num_tickets') + '</s>'
+                                }
+                            ],
+                            'actions': [
+                                {
+                                    'type': 'Action.Submit',
+                                    'title': 'Lookup',
+                                    'speak': '<s>Lookup</s>',
+                                    'data': {
+                                        'type': 'lookup'
+                                    }
                                 }
                             ]
                         }
-                    ]
-                }
-            ],
-            'actions': [
-                {
-                    'type': 'Action.ShowCard',
-                    'title': session.gettext(MainOptions.Lookup),
-                    'speak': '<s>' + session.gettext(MainOptions.Lookup) + '</s>',
-                    'card': {
-                        'type': 'AdaptiveCard',
-                        'body': [
-                            {
-                                'type': 'TextBlock',
-                                'text': session.gettext('concert_finder'),
-                                'speak': '<s>' + session.gettext('concert_finder') + '</s>',
-                                'weight': 'bolder',
-                                'size': 'medium'
-                            },
-                            {
-                                'type': 'TextBlock',
-                                'text': session.gettext('choose_celebrity')
-                            },
-                            {
-                                "type": "Input.ChoiceSet",
-                                "id": "celebrity",
-                                "style": "compact",
-                                "isMultiSelect": false,
-                                "value": "1",
-                                "choices": [
-                                    {
-                                        "title": session.gettext('celebrity_1'),
-                                        "value": "1"
-                                    },
-                                    {
-                                        "title": session.gettext('celebrity_2'),
-                                        "value": "2"
-                                    },
-                                    {
-                                        "title": session.gettext('celebrity_3'),
-                                        "value": "3"
+                    },
+                    {
+                        'type': 'Action.ShowCard',
+                        'title': session.gettext(MainOptions.Search),
+                        'speak': '<s>' + session.gettext(MainOptions.Search) + '</s>',
+                        'card': {
+                            'type': 'AdaptiveCard',
+                            'body': [
+                                {
+                                    'type': 'TextBlock',
+                                    'text': session.gettext('celebrity_info'),
+                                    'speak': '<s>' + session.gettext('celebrity_info') + '</s>',
+                                    'weight': 'bolder',
+                                    'size': 'medium'
+                                },
+                                {
+                                    'type': 'TextBlock',
+                                    'text': session.gettext('enter_celebrity')
+                                },
+                                {
+                                    'type': 'Input.Text',
+                                    'id': 'celebrity',
+                                    'speak': '<s>' + session.gettext('enter_celebrity') + '</s>',
+                                    'placeholder': 'Celine Dion',
+                                    'style': 'text'
+                                }
+                            ],
+                            'actions': [
+                                {
+                                    'type': 'Action.Submit',
+                                    'title': 'Search',
+                                    'speak': '<s>Search</s>',
+                                    'data': {
+                                        'type': 'search'
                                     }
-                                ]
-                            },
-                            {
-                                'type': 'TextBlock',
-                                'text': session.gettext('event_date')
-                            },
-                            {
-                                'type': 'Input.Date',
-                                'id': 'event_date',
-                                'speak': '<s>' + session.gettext('event_date') + '</s>'
-                            },
-                            {
-                                'type': 'TextBlock',
-                                'text': session.gettext('num_tickets')
-                            },
-                            {
-                                'type': 'Input.Number',
-                                'id': 'num_tickets',
-                                'min': 1,
-                                'max': 60,
-                                'speak': '<s>' + session.gettext('num_tickets') + '</s>'
-                            }
-                        ],
-                        'actions': [
-                            {
-                                'type': 'Action.Submit',
-                                'title': 'Lookup',
-                                'speak': '<s>Lookup</s>',
-                                'data': {
-                                    'type': 'lookup'
                                 }
-                            }
-                        ]
-                    }
-                },
-                {
-                    'type': 'Action.ShowCard',
-                    'title': session.gettext(MainOptions.Search),
-                    'speak': '<s>' + session.gettext(MainOptions.Search) + '</s>',
-                    'card': {
-                        'type': 'AdaptiveCard',
-                        'body': [
-                            {
-                                'type': 'TextBlock',
-                                'text': session.gettext('celebrity_info'),
-                                'speak': '<s>' + session.gettext('celebrity_info') + '</s>',
-                                'weight': 'bolder',
-                                'size': 'medium'
-                            },
-                            {
-                                'type': 'TextBlock',
-                                'text': session.gettext('enter_celebrity')
-                            },
-                            {
-                                'type': 'Input.Text',
-                                'id': 'celebrity',
-                                'speak': '<s>' + session.gettext('enter_celebrity') + '</s>',
-                                'placeholder': 'Celine Dion',
-                                'style': 'text'
-                            }
-                        ],
-                        'actions': [
-                            {
-                                'type': 'Action.Submit',
-                                'title': 'Search',
-                                'speak': '<s>Search</s>',
-                                'data': {
-                                    'type': 'search'
-                                }
-                            }
-                        ]
-                    }
-                },
-                // Hotels Search form
-                {
-                    'type': 'Action.ShowCard',
-                    'title': 'Hotels',
-                    'speak': '<s>Hotels</s>',
-                    'card': {
-                        'type': 'AdaptiveCard',
-                        'body': [
-                            {
-                                'type': 'TextBlock',
-                                'text': 'Welcome to the Caesars Hotels Reservation !',
-                                'speak': '<s>Welcome to the Caesars Hotels Reservation !</s>',
-                                'weight': 'bolder',
-                                'size': 'medium'
-                            },
-                            {
-                                'type': 'TextBlock',
-                                'text': 'Please choose your Location:'
-                            },
-                            {
+                            ]
+                        }
+                    },
+                    {
+                        'type': 'Action.ShowCard',
+                        'title': 'Hotels',
+                        'speak': '<s>Hotels</s>',
+                        'card': {
+                            'type': 'AdaptiveCard',
+                            'body': [
+                                {
+                                    'type': 'TextBlock',
+                                    'text': 'Welcome to the Caesars Hotels Reservation !',
+                                    'speak': '<s>Welcome to the Caesars Hotels Reservation !</s>',
+                                    'weight': 'bolder',
+                                    'size': 'medium'
+                                },
+                                {
+                                    'type': 'TextBlock',
+                                    'text': 'Please choose your Location:'
+                                },
+                                {
                                   "type": "Input.ChoiceSet",
                                   "id": "destination",
                                   "style": "compact",
@@ -234,69 +259,63 @@ var bot = new builder.UniversalBot(connector, function (session) {
                                     }
                                   ]
                                 },
-                            // {
-                            //     'type': 'Input.Text',
-                            //     'id': 'destination',
-                            //     'speak': '<s>Please choose your destination</s>',
-                            //     'placeholder': 'Miami, Florida',
-                            //     'style': 'text'
-                            // },
-                            {
-                                'type': 'TextBlock',
-                                'text': 'When do you want to check in?'
-                            },
-                            {
-                                'type': 'Input.Date',
-                                'id': 'checkin',
-                                'speak': '<s>When do you want to check in?</s>'
-                            },
-                            {
-                                'type': 'TextBlock',
-                                'text': 'How many nights do you want to stay?'
-                            },
-                            {
-                                'type': 'Input.Number',
-                                'id': 'nights',
-                                'min': 1,
-                                'max': 60,
-                                'speak': '<s>How many nights do you want to stay?</s>'
-                            }
-                        ],
-                        'actions': [
-                            {
-                                'type': 'Action.Submit',
-                                'title': 'Search',
-                                'speak': '<s>Search</s>',
-                                'data': {
-                                    'type': 'hotelSearch'
+                                {
+                                    'type': 'TextBlock',
+                                    'text': 'When do you want to check in?'
+                                },
+                                {
+                                    'type': 'Input.Date',
+                                    'id': 'checkin',
+                                    'speak': '<s>When do you want to check in?</s>'
+                                },
+                                {
+                                    'type': 'TextBlock',
+                                    'text': 'How many nights do you want to stay?'
+                                },
+                                {
+                                    'type': 'Input.Number',
+                                    'id': 'nights',
+                                    'min': 1,
+                                    'max': 60,
+                                    'speak': '<s>How many nights do you want to stay?</s>'
                                 }
-                            }
-                        ]
+                            ],
+                            'actions': [
+                                {
+                                    'type': 'Action.Submit',
+                                    'title': 'Search',
+                                    'speak': '<s>Search</s>',
+                                    'data': {
+                                        'type': 'hotelSearch'
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    {
+                        'type': 'Action.ShowCard',
+                        'title': session.gettext(MainOptions.Support),
+                        'speak': '<s>' + session.gettext(MainOptions.Support) + '</s>',
+                        'card': {
+                            'type': 'AdaptiveCard',
+                            'body': [
+                                {
+                                    'type': 'TextBlock',
+                                    'text': session.gettext('support'),
+                                    'speak': '<s>' + session.gettext('support') + '</s>',
+                                    'size': 'small'
+                                }
+                            ]
+                        }
                     }
-                },
-                {
-                    'type': 'Action.ShowCard',
-                    'title': session.gettext(MainOptions.Support),
-                    'speak': '<s>' + session.gettext(MainOptions.Support) + '</s>',
-                    'card': {
-                        'type': 'AdaptiveCard',
-                        'body': [
-                            {
-                                'type': 'TextBlock',
-                                'text': session.gettext('support'),
-                                'speak': '<s>' + session.gettext('support') + '</s>',
-                                'size': 'small'
-                            }
-                        ]
-                    }
-                }
-            ]
-        }
-    };
+                ]
+            }
+        };
 
-    session.send(new builder.Message(session)
-        .addAttachment(welcomeCard));
-});
+        session.send(new builder.Message(session)
+            .addAttachment(welcomeCard));
+    }
+);
 
 function processSubmitAction(session, value) {
     var defaultErrorMessage = 'Please complete all the search parameters';
@@ -318,9 +337,7 @@ function processSubmitAction(session, value) {
             break;
 
         case 'hotelSearch':
-            // Search, validate parameters
             if (validateHotelSearch(value)) {
-                // proceed to search
                 session.beginDialog('hotel-search:/', value);
             } else {
                 session.send(defaultErrorMessage);
@@ -328,12 +345,10 @@ function processSubmitAction(session, value) {
             break;
 
         case 'hotelSelection':
-            // Hotel selection
             sendHotelSelection(session, value);
             break;
 
         case 'showSummary':
-            // Hotel selection
             showSummaryCard(session, value);
             break;
 
@@ -383,6 +398,90 @@ bot.set('localizerSettings', {
     defaultLocale: 'en'
 });
 
+
+
+/* ******************************************* Image Module Begin ******************************************* */
+
+
+//=========================================================
+// Utilities
+//=========================================================
+function hasImageAttachment(session) {
+
+    if(!session
+        || !session.message
+        || !session.message.attachments
+        || !session.message.attachments.length) return false;
+
+    return session.message.attachments.length > 0 &&
+        session.message.attachments[0].contentType.indexOf('image') !== -1;
+}
+
+function getImageStreamFromMessage(message) {
+    var headers = {};
+    var attachment = message.attachments[0];
+    if (checkRequiresToken(message)) {
+        // The Skype attachment URLs are secured by JwtToken,
+        // you should set the JwtToken of your bot as the authorization header for the GET request your bot initiates to fetch the image.
+        // https://github.com/Microsoft/BotBuilder/issues/662
+        connector.getAccessToken(function (error, token) {
+            var tok = token;
+            console.log(token);
+            headers['Authorization'] = 'Bearer ' + token;
+            headers['Content-Type'] = 'application/octet-stream';
+
+            return needle.get(attachment.contentUrl, { headers: headers });
+        });
+    }
+
+    headers['Content-Type'] = attachment.contentType;
+    return needle.get(attachment.contentUrl, { headers: headers });
+}
+
+function checkRequiresToken(message) {
+    return message.source === 'skype' || message.source === 'msteams';
+}
+
+/**
+ * Gets the href value in an anchor element.
+ * Skype transforms raw urls to html. Here we extract the href value from the url
+ * @param {string} input Anchor Tag
+ * @return {string} Url matched or null
+ */
+function parseAnchorTag(input) {
+    var match = input.match('^<a href=\"([^\"]*)\">[^<]*</a>$');
+    if (match && match[1]) {
+        return match[1];
+    }
+
+    return null;
+}
+
+//=========================================================
+// Response Handling
+//=========================================================
+function handleSuccessResponse(session, caption) {
+    if (caption) {
+        session.send('I think it\'s ' + caption);
+    }
+    else {
+        session.send('Couldn\'t find a caption for this one');
+    }
+
+}
+
+function handleErrorResponse(session, error) {
+    var clientErrorMessage = 'Oops! Something went wrong. Try again later.';
+    if (error.message && error.message.indexOf('Access denied') > -1) {
+        clientErrorMessage += "\n" + error.message;
+    }
+
+    console.error(error);
+    session.send(clientErrorMessage);
+}
+/* ******************************************* Image Module End ******************************************* */
+
+
 /* ******************************************* QnA Module Begin ******************************************* */
 var recognizer = new cognitiveservices.QnAMakerRecognizer({
     knowledgeBaseId: process.env.QnAKnowledgebaseId, 
@@ -421,7 +520,7 @@ basicQnAMakerDialog.defaultWaitNextMessage = function(session, qnaMakerResult){
 
 bot.dialog('qna', basicQnAMakerDialog)
 .triggerAction({
-    matches: [/^(?!.*(help|menu|settings|support|restart|start over|Changed my mind))/i],
+    matches: [/^(?!.*(help|menu|settings|support|restart|start over|Changed my mind|agent))/i],
     onSelectAction: (session, args, next) => {
         session.beginDialog(args.action, args);
     }
@@ -540,7 +639,8 @@ function sendMessage(message) {
 module.exports = {
     listen: listen,
     beginDialog: beginDialog,
-    sendMessage: sendMessage
+    sendMessage: sendMessage,
+    bot: bot
 };
 
 
@@ -1050,5 +1150,4 @@ function showSummaryCard(session, regForm){
     var msg = new builder.Message(session)
         .addAttachment(card);
     session.send(msg);
-
 }
