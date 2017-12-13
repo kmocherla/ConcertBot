@@ -456,7 +456,7 @@ var translator = function (session, languageCode, callback) {
             } else {
                 var stringResponse = JSON.stringify(response.body);
                 var translatedText = JSON.parse(JSON.stringify(parseXml(response.body)));
-                session.message.text = translatedText.children[0].children[0].text.toLowerCase();
+//                session.message.text = translatedText.children[0].children[0].text.toLowerCase();
                 return callback(translatedText.children[0].children[0].text);
             }
         });
@@ -564,51 +564,6 @@ function redirectUrl(caption) {
 /* ******************************************* Image Module End ******************************************* */
 
 
-/* ******************************************* QnA Module Begin ******************************************* */
-var recognizer = new cognitiveservices.QnAMakerRecognizer({
-    knowledgeBaseId: process.env.QnAKnowledgebaseId, 
-    subscriptionKey: process.env.QnASubscriptionKey,
-    top: 4});
-
-var qnaMakerTools = new cognitiveservices.QnAMakerTools();
-bot.library(qnaMakerTools.createLibrary());
-    
-var basicQnAMakerDialog = new cognitiveservices.QnAMakerDialog({
-    recognizers: [recognizer],
-    defaultMessage: 'No match! Try changing the query terms!',
-    qnaThreshold: 0.3,
-    feedbackLib: qnaMakerTools
-});
-
-// Override to also include the knowledgebase question with the answer on confident matches
-basicQnAMakerDialog.respondFromQnAMakerResult = function(session, qnaMakerResult){
-    var result = qnaMakerResult;
-    console.log(result);
-    console.log(JSON.stringify(result));
-    var response = 'Here is the match from FAQ:  \r\n  Q: ' + result.answers[0].questions[0] + '  \r\n A: ' + result.answers[0].answer;
-    session.send(response);
-}
-
-// Override to log user query and matched Q&A before ending the dialog
-basicQnAMakerDialog.defaultWaitNextMessage = function(session, qnaMakerResult){
-    if(session.privateConversationData.qnaFeedbackUserQuestion != null && qnaMakerResult.answers != null && qnaMakerResult.answers.length > 0 
-        && qnaMakerResult.answers[0].questions != null && qnaMakerResult.answers[0].questions.length > 0 && qnaMakerResult.answers[0].answer != null){
-            console.log('User Query: ' + session.privateConversationData.qnaFeedbackUserQuestion);
-            console.log('KB Question: ' + qnaMakerResult.answers[0].questions[0]);
-            console.log('KB Answer: ' + qnaMakerResult.answers[0].answer);
-        }
-    session.endDialog();
-}
-
-bot.dialog('qna', basicQnAMakerDialog)
-.triggerAction({
-    matches: [/^(?!.*(help|menu|settings|support|restart|start over|Changed my mind|agent))/i],
-    onSelectAction: (session, args, next) => {
-        session.beginDialog(args.action, args);
-    }
-});
-/* ******************************************* QnA Module End ******************************************* */
-
 
 /* ******************************************* DocDB Module Begin ******************************************* */
 
@@ -652,13 +607,6 @@ bot.use({
         var supportRegex = localizedRegex(session, ['main_options_talk_to_support', 'help']);
         var restartRegex = localizedRegex(session, ['restart', 'start_over', 'change_my_mind', 'menu']);
 
-        var languageDetect = detectLanguage(session, function(languageCode) {
-            console.log(languageCode);
-            var translatedText = translator(session, languageCode, function(response) {
-                console.log(response);
-            });
-        });
-
         if (settingsRegex.test(text)) {
             // interrupt and trigger 'settings' dialog 
             return session.beginDialog('settings:/');
@@ -688,6 +636,66 @@ bot.on('conversationUpdate', function (message) {
         });
     }
 });
+
+
+/* ******************************************* QnA Module Begin ******************************************* */
+var recognizer = new cognitiveservices.QnAMakerRecognizer({
+    knowledgeBaseId: process.env.QnAKnowledgebaseId, 
+    subscriptionKey: process.env.QnASubscriptionKey,
+    top: 4});
+
+var qnaMakerTools = new cognitiveservices.QnAMakerTools();
+bot.library(qnaMakerTools.createLibrary());
+    
+var basicQnAMakerDialog = new cognitiveservices.QnAMakerDialog({
+    recognizers: [recognizer],
+    defaultMessage: 'No match! Try changing the query terms!',
+    qnaThreshold: 0.3,
+    feedbackLib: qnaMakerTools
+});
+
+// Override to also include the knowledgebase question with the answer on confident matches
+basicQnAMakerDialog.respondFromQnAMakerResult = function(session, qnaMakerResult){
+    var result = qnaMakerResult;
+    console.log(result);
+    console.log(JSON.stringify(result));
+    var response = 'Here is the match from FAQ:  \r\n  Q: ' + result.answers[0].questions[0] + '  \r\n A: ' + result.answers[0].answer;
+    session.send(response);
+}
+
+// Override to log user query and matched Q&A before ending the dialog
+basicQnAMakerDialog.defaultWaitNextMessage = function(session, qnaMakerResult){
+    if(session.privateConversationData.qnaFeedbackUserQuestion != null && qnaMakerResult.answers != null && qnaMakerResult.answers.length > 0 
+        && qnaMakerResult.answers[0].questions != null && qnaMakerResult.answers[0].questions.length > 0 && qnaMakerResult.answers[0].answer != null){
+            console.log('User Query: ' + session.privateConversationData.qnaFeedbackUserQuestion);
+            console.log('KB Question: ' + qnaMakerResult.answers[0].questions[0]);
+            console.log('KB Answer: ' + qnaMakerResult.answers[0].answer);
+        }
+    session.endDialog();
+}
+
+bot.dialog('qna', basicQnAMakerDialog)
+.triggerAction({
+    matches: [/^(?!.*(help|menu|settings|support|restart|start over|Changed my mind|agent))/i],
+    onSelectAction: (session, args, next) => {
+
+        var languageDetect = detectLanguage(session, function(languageCode) {
+            console.log(languageCode);
+
+            if(languageCode.indexOf('en') > -1) {
+                session.beginDialog(args.action, args);
+            } else {
+                var translatedText = translator(session, languageCode, function(response) {
+                    console.log(response);
+                    session.message.text = response;
+                    session.beginDialog(args.action, args);
+                });
+            }
+        });
+    }
+});
+/* ******************************************* QnA Module End ******************************************* */
+
 
 // Cache of localized regex to match selection from main options
 var LocalizedRegexCache = {};
