@@ -407,15 +407,40 @@ bot.set('localizerSettings', {
 
 var TOLOCALE = 'en';
 var FROMLOCALE = 'zh-CHS';
-var translator = function (session, callback) {
+
+var detectLanguage = function(session, callback) {
+
+    var options = {
+        method: 'POST',
+        url: 'https://westcentralus.api.cognitive.microsoft.com/text/analytics/v2.0/languages?numberOfLanguagesToDetect=1',
+        body: { documents: [{ id: 'message', text: session.message.text }]},
+        json: true,
+        headers: {
+            'Ocp-Apim-Subscription-Key': process.env.LANG_DETECTION_KEY
+        }
+    };
+    request(options, function (error, response, body) {
+        if (!error && body) {
+            if (body.documents && body.documents.length > 0) {
+                var languages = body.documents[0].detectedLanguages;
+                if (languages && languages.length > 0) {
+                    return callback(languages[0].iso6391Name);
+                }
+            }
+        }
+    });
+}
+
+var translator = function (session, languageCode, callback) {
 
     if (session.message && session.message.text) {
+
         var urlencodedtext = urlencode(session.message.text);
         var options = {
             method: 'GET',
             url: 'http://api.microsofttranslator.com/v2/Http.svc/Translate'
                 +'?text=' + urlencodedtext
-                +'&from=' + FROMLOCALE +'&to=' + TOLOCALE,
+                +'&from=' + languageCode +'&to=' + TOLOCALE,
             headers: {
                 'Ocp-Apim-Subscription-Key': process.env.LANG_TRANSLATION_KEY
             }
@@ -626,8 +651,12 @@ bot.use({
         var settingsRegex = localizedRegex(session, ['main_options_settings']);
         var supportRegex = localizedRegex(session, ['main_options_talk_to_support', 'help']);
         var restartRegex = localizedRegex(session, ['restart', 'start_over', 'change_my_mind', 'menu']);
-        var translatedText = translator(session, function(response) {
-            console.log(response);
+
+        var languageDetect = detectLanguage(session, function(languageCode) {
+            console.log(languageCode);
+            var translatedText = translator(session, languageCode, function(response) {
+                console.log(response);
+            });
         });
 
         if (settingsRegex.test(text)) {
